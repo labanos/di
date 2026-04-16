@@ -30,8 +30,8 @@ jobs:
             -o StrictHostKeyChecking=no \
             -o UserKnownHostsFile=/dev/null \
             -P ${{ secrets.SFTP_PORT }} \
-            "${{ secrets.SFTP_USER }}@${{ secrets.SFTP_HOST }}" <<SFTP
-          cd ${{ secrets.DI_SFTP_PATH }}
+            "${{ secrets.SFTP_USER }}@${{ secrets.SFTP_HOST }}" <<'SFTP'
+          cd di.labanos.dk
           put php/db_connect.php db_connect.php
           put php/db_migrate.php db_migrate.php
           put php/players.php players.php
