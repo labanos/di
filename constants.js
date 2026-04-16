@@ -1,5 +1,5 @@
 // ─── Constants ───────────────────────────────────────────────────────────────
-const API = 'php';
+const API = 'https://labanos.dk/di';
 
 const TEAM = {
   blue: { label: 'Blue', bg: 'bg-blue-600', text: 'text-blue-600', border: 'border-blue-600', hex: '#2563eb' },
