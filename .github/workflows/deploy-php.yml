@@ -31,7 +31,8 @@ jobs:
             -o UserKnownHostsFile=/dev/null \
             -P ${{ secrets.SFTP_PORT }} \
             "${{ secrets.SFTP_USER }}@${{ secrets.SFTP_HOST }}" <<'SFTP'
-          cd di.labanos.dk
+          mkdir di
+          cd di
           put php/db_connect.php db_connect.php
           put php/db_migrate.php db_migrate.php
           put php/players.php players.php
@@ -43,4 +44,4 @@ jobs:
           SFTP
 
       - name: Done
-        run: echo "PHP files deployed to di.labanos.dk"
+        run: echo "PHP files deployed to labanos.dk/di"
