@@ -11,19 +11,38 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
+      - name: Install sshpass
+        run: sudo apt-get install -y sshpass
 
-      - name: Install dependencies
-        run: pip install pandas openpyxl pymysql
-
-      - name: Run migration
+      - name: Run SQL migrations via SSH + MySQL
+        env:
+          SFTP_PASS: ${{ secrets.SFTP_PASS }}
+          SFTP_USER: ${{ secrets.SFTP_USER }}
+          SFTP_HOST: ${{ secrets.SFTP_HOST }}
+          SFTP_PORT: ${{ secrets.SFTP_PORT }}
+          DB_HOST: ${{ secrets.DB_HOST }}
+          DB_USER: ${{ secrets.DB_USER }}
+          DB_PASS: ${{ secrets.DB_PASS }}
+          DI_DB_NAME: ${{ secrets.DI_DB_NAME }}
         run: |
-          python migrate/migrate_excel.py \
-            --host "${{ secrets.DB_HOST }}" \
-            --db   "${{ secrets.DI_DB_NAME }}" \
-            --user "${{ secrets.DB_USER }}" \
-            --password "${{ secrets.DB_PASS }}" \
-            --file migrate/di_data.xlsx
+          for sql_file in \
+            migrate/sql/00_schema.sql \
+            migrate/sql/01_setup.sql \
+            migrate/sql/02_results_2019.sql \
+            migrate/sql/02_results_2020.sql \
+            migrate/sql/02_results_2021.sql \
+            migrate/sql/02_results_2022.sql \
+            migrate/sql/02_results_2023.sql \
+            migrate/sql/02_results_2024.sql \
+            migrate/sql/02_results_2025.sql; do
+            echo "Running: $sql_file"
+            sshpass -p "${SFTP_PASS}" ssh \
+              -p "${SFTP_PORT}" \
+              -o StrictHostKeyChecking=no \
+              -o BatchMode=no \
+              "${SFTP_USER}@${SFTP_HOST}" \
+              "mysql -h ${DB_HOST} -u ${DB_USER} -p${DB_PASS} ${DI_DB_NAME}" \
+              < "${sql_file}"
+            echo "Done: $sql_file"
+          done
+          echo "All migrations complete!"
