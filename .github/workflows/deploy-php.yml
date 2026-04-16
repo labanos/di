@@ -1,0 +1,46 @@
+name: Deploy PHP to di.labanos.dk
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'php/**'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Inject DB credentials
+        run: |
+          FILES="php/db_connect.php php/db_migrate.php php/players.php php/leaderboard.php php/results.php php/player_stats.php php/matches.php"
+          sed -i "s|%%DB_HOST%%|${{ secrets.DB_HOST }}|g" $FILES
+          sed -i "s|%%DB_NAME%%|${{ secrets.DI_DB_NAME }}|g" $FILES
+          sed -i "s|%%DB_USER%%|${{ secrets.DB_USER }}|g" $FILES
+          sed -i "s|%%DB_PASS%%|${{ secrets.DB_PASS }}|g" $FILES
+
+      - name: Install sshpass
+        run: sudo apt-get install -y sshpass
+
+      - name: Deploy via SFTP
+        run: |
+          sshpass -p "${{ secrets.SFTP_PASS }}" sftp \
+            -o StrictHostKeyChecking=no \
+            -o UserKnownHostsFile=/dev/null \
+            -P ${{ secrets.SFTP_PORT }} \
+            "${{ secrets.SFTP_USER }}@${{ secrets.SFTP_HOST }}" <<SFTP
+          cd ${{ secrets.DI_SFTP_PATH }}
+          put php/db_connect.php db_connect.php
+          put php/db_migrate.php db_migrate.php
+          put php/players.php players.php
+          put php/leaderboard.php leaderboard.php
+          put php/results.php results.php
+          put php/player_stats.php player_stats.php
+          put php/matches.php matches.php
+          put php/.htaccess .htaccess
+          SFTP
+
+      - name: Done
+        run: echo "PHP files deployed to di.labanos.dk"

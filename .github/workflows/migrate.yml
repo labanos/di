@@ -1,0 +1,29 @@
+name: Run DB Migration
+
+# Trigger manually from GitHub Actions UI
+on:
+  workflow_dispatch:
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install pandas openpyxl pymysql
+
+      - name: Run migration
+        run: |
+          python migrate/migrate_excel.py \
+            --host "${{ secrets.DB_HOST }}" \
+            --db   "${{ secrets.DI_DB_NAME }}" \
+            --user "${{ secrets.DB_USER }}" \
+            --password "${{ secrets.DB_PASS }}" \
+            --file migrate/di_data.xlsx
