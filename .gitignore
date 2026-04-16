@@ -1,0 +1,6 @@
+di.code-workspace
+*.env
+node_modules/
+__pycache__/
+*.pyc
+migrate/*.xlsx
