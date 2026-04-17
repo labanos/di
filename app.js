@@ -6,7 +6,7 @@ const TABS = [
 ];
 
 function App() {
-  const [tab, setTab]       = React.useState('leaderboard');
+  const [tab, setTab]           = React.useState('leaderboard');
   const [playerView, setPlayer] = React.useState(null);
 
   React.useEffect(() => {
@@ -22,12 +22,15 @@ function App() {
     <div className="min-h-screen bg-slate-100">
       <div className="bg-slate-900 text-white">
         <div className="max-w-3xl mx-auto px-4">
-          <div className="flex items-center justify-between py-4">
+          <div className="flex items-center justify-between py-3">
             <button
               onClick={() => { setTab('leaderboard'); setPlayer(null); }}
-              className="text-lg font-black tracking-tight">
-              DI
-              <span className="text-xs font-normal text-slate-400 ml-2">Damsgaard Invitational</span>
+              className="block">
+              <img
+                src="damsgaard-invitational-logo.jpeg"
+                alt="Damsgaard Invitational"
+                className="h-10 rounded"
+              />
             </button>
           </div>
           {!playerView && (
