@@ -7,8 +7,8 @@
 // POST {action:'merge_players'} -> reassign results from merge_id -> keep_id, delete merge_id
 // POST {action:'delete_player'} -> delete player (only if no results)
 // POST {action:'delete_match'}  -> delete match and all its results
-// POST (no action)              -> replace match results
-// v1.4
+// POST (no action)              -> replace match results (creates match row if needed)
+// v1.5
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
@@ -125,8 +125,6 @@ if ($method === 'POST') {
     }
 
     // ── Merge players ─────────────────────────────────────────────────────────
-    // Reassigns all match_results from merge_id to keep_id, then deletes merge_id.
-    // If both have a result in the same match, the merge_id row is discarded.
     if ($action === 'merge_players') {
         $keep_id  = (int)($data['keep_id']  ?? 0);
         $merge_id = (int)($data['merge_id'] ?? 0);
@@ -136,11 +134,9 @@ if ($method === 'POST') {
             exit;
         }
 
-        // Fix partner references (other players who listed merge_id as partner)
         $pdo->prepare("UPDATE match_results SET partner_id = ? WHERE partner_id = ?")
             ->execute([$keep_id, $merge_id]);
 
-        // Move results that don't conflict (keep_id has no result for the same match)
         $pdo->prepare("
             UPDATE match_results
             SET player_id = ?
@@ -152,11 +148,8 @@ if ($method === 'POST') {
               )
         ")->execute([$keep_id, $merge_id, $keep_id]);
 
-        // Drop any remaining rows for merge_id (conflict matches — keep_id already has one)
         $pdo->prepare("DELETE FROM match_results WHERE player_id = ?")
             ->execute([$merge_id]);
-
-        // Delete the merged player
         $pdo->prepare("DELETE FROM players WHERE id = ?")
             ->execute([$merge_id]);
 
@@ -195,7 +188,7 @@ if ($method === 'POST') {
         exit;
     }
 
-    // ── Replace match results (no action = match save) ────────────────────────
+    // ── Save match results (creates the match row if it doesn't exist yet) ────
     $year         = (int)($data['year']         ?? 0);
     $round_number = (int)($data['round_number'] ?? 0);
     $match_number = (int)($data['match_number'] ?? 0);
@@ -209,6 +202,7 @@ if ($method === 'POST') {
         exit;
     }
 
+    // Look up existing match row
     $stmt = $pdo->prepare("
         SELECT m.id FROM matches m
         JOIN rounds r ON r.id = m.round_id
@@ -217,12 +211,27 @@ if ($method === 'POST') {
     ");
     $stmt->execute([$year, $round_number, $match_number]);
     $match = $stmt->fetch();
+
     if (!$match) {
-        http_response_code(404);
-        echo json_encode(['error' => "Match not found: year=$year round=$round_number match=$match_number"]);
-        exit;
+        // Match row missing — find the round and create it
+        $stmt2 = $pdo->prepare("
+            SELECT r.id FROM rounds r
+            JOIN tournaments t ON t.id = r.tournament_id
+            WHERE t.year = ? AND r.round_number = ?
+        ");
+        $stmt2->execute([$year, $round_number]);
+        $round_row = $stmt2->fetch();
+        if (!$round_row) {
+            http_response_code(404);
+            echo json_encode(['error' => "Round not found: year=$year round=$round_number"]);
+            exit;
+        }
+        $pdo->prepare("INSERT INTO matches (round_id, match_number) VALUES (?, ?)")
+            ->execute([$round_row['id'], $match_number]);
+        $match_id = (int)$pdo->lastInsertId();
+    } else {
+        $match_id = (int)$match['id'];
     }
-    $match_id = $match['id'];
 
     $resolved = [];
     foreach ($players as $p) {
@@ -265,7 +274,8 @@ if ($method === 'POST') {
         $stmt->execute($r);
     }
 
-    echo json_encode(['ok' => true]);
+    // Return match_id so the UI can update the card's dataset for subsequent deletes
+    echo json_encode(['ok' => true, 'match_id' => $match_id]);
     exit;
 }
 
