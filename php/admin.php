@@ -2,6 +2,7 @@
 // Admin endpoint: read/write match results by human-readable names
 // GET  ?year=X&round=Y  -> all match slots for that round (with results if they exist)
 // POST                  -> upsert a match result from player names + winner/ups
+// v1.1
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
