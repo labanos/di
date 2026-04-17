@@ -1,3 +1,14 @@
+-- Ensure this session uses utf8mb4
+SET NAMES utf8mb4;
+
+-- Fix any garbled Danish characters from a previous latin1 migration run
+UPDATE players SET name = 'Carsten Ekstrøm'  WHERE name LIKE 'Carsten Ekstr%m'    AND name != 'Carsten Ekstrøm';
+UPDATE players SET name = 'Michael Møller'   WHERE name LIKE 'Michael M%ller'     AND name != 'Michael Møller';
+UPDATE players SET name = 'Morten Bjørkmann' WHERE name LIKE 'Morten Bj%rkmann'   AND name != 'Morten Bjørkmann';
+UPDATE players SET name = 'Nikke Harkjær'    WHERE name LIKE 'Nikke Harkj%r'      AND name != 'Nikke Harkjær';
+UPDATE players SET name = 'Søren Platz'      WHERE name LIKE '%ren Platz'         AND name != 'Søren Platz';
+UPDATE players SET name = 'Søren Tetsche'    WHERE name LIKE '%ren Tetsche'       AND name != 'Søren Tetsche';
+
 -- DI setup: players, tournaments, rounds, matches
 -- Players
 INSERT IGNORE INTO players (name, team) VALUES ('Anders Brandt Larsen', 'blue');
