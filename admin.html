@@ -248,6 +248,7 @@
       const card = document.createElement('div');
       card.className = 'bg-white rounded-2xl shadow p-5';
       card.dataset.matchNumber = match.match_number;
+      card.dataset.matchId     = match.match_id || '';
 
       const resultOpts = `
         <option value="">— result —</option>
@@ -258,9 +259,16 @@
       card.innerHTML = `
         <div class="flex items-center justify-between mb-4">
           <h3 class="font-bold text-lg">Match ${match.match_number}</h3>
-          <span class="match-badge text-xs px-2 py-1 rounded-full font-medium ${hasData?'bg-green-100 text-green-700':'bg-gray-100 text-gray-500'}">
-            ${hasData?'✓ Saved':'Empty'}
-          </span>
+          <div class="flex items-center gap-2">
+            <span class="match-badge text-xs px-2 py-1 rounded-full font-medium ${hasData?'bg-green-100 text-green-700':'bg-gray-100 text-gray-500'}">
+              ${hasData?'✓ Saved':'Empty'}
+            </span>
+            <button onclick="deleteMatch(this)"
+              class="text-xs text-red-400 hover:text-red-600 hover:bg-red-50 px-2 py-1 rounded-lg transition"
+              title="Delete this match">
+              🗑 Delete
+            </button>
+          </div>
         </div>
         <div class="grid grid-cols-2 gap-4 mb-4">
           <div class="space-y-2">
@@ -302,6 +310,40 @@
       const c = document.getElementById('matches-container');
       c.appendChild(buildMatchCard(nm));
       c.lastElementChild.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+
+    async function deleteMatch(btn) {
+      const card    = btn.closest('[data-match-number]');
+      const matchId = card.dataset.matchId;
+      const matchNo = card.dataset.matchNumber;
+
+      // Not yet saved to DB — just remove from the page
+      if (!matchId) {
+        card.remove();
+        currentMatches = currentMatches.filter(m => String(m.match_number) !== matchNo);
+        return;
+      }
+
+      if (!confirm(`Delete Match ${matchNo}?\n\nThis will permanently remove the match and all its results.`)) return;
+
+      btn.disabled = true;
+      try {
+        const res = await fetch(`${API}/admin.php`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'delete_match', match_id: parseInt(matchId) }),
+        });
+        const data = await res.json();
+        if (data.ok) {
+          card.remove();
+          currentMatches = currentMatches.filter(m => String(m.match_number) !== matchNo);
+        } else {
+          alert('Error: ' + (data.error || 'Unknown'));
+          btn.disabled = false;
+        }
+      } catch(e) {
+        alert('Network error');
+        btn.disabled = false;
+      }
     }
 
     async function saveMatch(btn) {
