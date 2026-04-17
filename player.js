@@ -25,10 +25,10 @@ function PlayerView({ playerId, onBack }) {
         <div className="text-sm font-medium opacity-80 mb-1">{t.label} Team</div>
         <div className="text-2xl font-black">{data.name}</div>
         <div className="mt-4 grid grid-cols-4 gap-4 text-center">
-          <div><div className="text-2xl font-black mono">{data.total_points}</div><div className="text-xs opacity-70">Points</div></div>
+          <div><div className="text-2xl font-black mono">{fmtPts(data.total_points)}</div><div className="text-xs opacity-70">Points</div></div>
           <div><div className="text-2xl font-black mono">{data.matches_played}</div><div className="text-xs opacity-70">Matches</div></div>
           <div><div className="text-2xl font-black mono">{data.total_ups}</div><div className="text-xs opacity-70">UPs</div></div>
-          <div><div className="text-2xl font-black mono">{data.avg_points}</div><div className="text-xs opacity-70">Avg</div></div>
+          <div><div className="text-2xl font-black mono">{fmtAvg(data.avg_points)}</div><div className="text-xs opacity-70">Avg</div></div>
         </div>
       </div>
 
@@ -57,7 +57,7 @@ function PlayerView({ playerId, onBack }) {
               <tr key={y.year} className="border-b border-slate-50 text-right">
                 <td className="px-4 py-2 text-left font-medium text-slate-700">{y.year}</td>
                 <td className="px-4 py-2 mono text-slate-500">{y.matches}</td>
-                <td className="px-4 py-2 mono font-bold">{y.points}</td>
+                <td className="px-4 py-2 mono font-bold">{fmtPts(y.points)}</td>
                 <td className="px-4 py-2 mono text-green-600">{y.wins}</td>
                 <td className="px-4 py-2 mono text-amber-500">{y.halves}</td>
                 <td className="px-4 py-2 mono text-slate-400">{y.losses}</td>
