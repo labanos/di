@@ -34,7 +34,6 @@
           <span class="text-2xl">⛳</span>
           <h1 class="text-xl font-bold">DI Admin</h1>
         </div>
-        <!-- Tabs -->
         <div class="flex gap-1">
           <button onclick="showTab('matches')" id="tab-matches"
             class="tab-btn px-4 py-1.5 rounded-lg text-sm font-semibold bg-blue-600 text-white transition">
@@ -55,9 +54,9 @@
         <div>
           <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Year</label>
           <select id="year-select" class="border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-            <option>2019</option><option>2020</option><option>2021</option>
-            <option>2022</option><option>2023</option><option>2024</option>
-            <option selected>2025</option>
+            <option>2016</option><option>2017</option><option>2018</option><option>2019</option>
+            <option>2020</option><option>2021</option><option>2022</option>
+            <option>2023</option><option>2024</option><option selected>2025</option>
           </select>
         </div>
         <div>
@@ -91,7 +90,6 @@
     <!-- ── PLAYERS TAB ─────────────────────────────────────────────────── -->
     <div id="tab-players-content" class="hidden max-w-4xl mx-auto px-4 py-6">
 
-      <!-- Add player -->
       <div class="bg-white rounded-2xl shadow p-4 mb-6">
         <h2 class="font-semibold text-sm uppercase tracking-wide text-gray-500 mb-3">Add New Player</h2>
         <div class="flex gap-3 items-end">
@@ -115,7 +113,6 @@
         </div>
       </div>
 
-      <!-- Player list -->
       <div id="players-loading" class="hidden text-center py-12 text-gray-400">
         <div class="text-4xl mb-2">⏳</div><p>Loading players…</p>
       </div>
@@ -381,6 +378,8 @@
         });
         const data = await res.json();
         if (data.ok) {
+          // Store the real DB match_id so delete works correctly on this card
+          if (data.match_id) card.dataset.matchId = String(data.match_id);
           status.textContent = '✓ Saved!'; status.className = 'save-status text-sm text-green-600';
           const badge = card.querySelector('.match-badge');
           badge.textContent = '✓ Saved'; badge.className = 'match-badge text-xs px-2 py-1 rounded-full font-medium bg-green-100 text-green-700';
@@ -414,7 +413,6 @@
         .join('');
       return `
         <div class="bg-white rounded-xl shadow-sm p-3 space-y-2" id="player-row-${p.id}">
-          <!-- View mode -->
           <div class="player-view flex items-center justify-between gap-2">
             <span class="text-sm font-medium flex-1">${esc(p.name)}</span>
             <button onclick="startEdit(${p.id})"
@@ -424,7 +422,6 @@
             <button onclick="deletePlayer(${p.id}, '${esc(p.name)}')"
               class="text-xs text-red-400 hover:underline px-2 py-1">Delete</button>
           </div>
-          <!-- Edit mode (hidden) -->
           <div class="player-edit hidden space-y-2">
             <input type="text" value="${esc(p.name)}"
               class="w-full border rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 edit-name">
@@ -440,7 +437,6 @@
               <span class="edit-status text-xs self-center"></span>
             </div>
           </div>
-          <!-- Merge mode (hidden) -->
           <div class="player-merge hidden space-y-2 border-t pt-2 mt-1">
             <p class="text-xs text-gray-500">Merge <strong>${esc(p.name)}</strong> into:</p>
             <div class="flex gap-2">
@@ -505,7 +501,7 @@
       const row    = document.getElementById(`player-row-${mergeId}`);
       const keepId = parseInt(row.querySelector('.merge-target').value);
       if (!keepId) { alert('Please select the player to keep.'); return; }
-      const keepName = allPlayers.find(p => p.id === keepId)?.name || '';
+      const keepName  = allPlayers.find(p => p.id === keepId)?.name  || '';
       const mergeName = allPlayers.find(p => p.id === mergeId)?.name || '';
       if (!confirm(`Merge "${mergeName}" into "${keepName}"?\n\nAll match results from "${mergeName}" will move to "${keepName}", and "${mergeName}" will be permanently deleted.`)) return;
       btn.disabled = true;
