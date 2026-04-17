@@ -1,8 +1,8 @@
 <?php
 // Admin endpoint: read/write match results by human-readable names
 // GET  ?year=X&round=Y  -> all match slots for that round (with results if they exist)
-// POST                  -> upsert a match result from player names + winner/ups
-// v1.1
+// POST                  -> replace a match result from player names + winner/ups
+// v1.2
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
@@ -68,7 +68,7 @@ if ($method === 'GET') {
     exit;
 }
 
-// ── POST: upsert match results ───────────────────────────────────────────────
+// ── POST: replace match results (delete old rows, insert fresh) ──────────────
 if ($method === 'POST') {
     $data = json_decode(file_get_contents('php://input'), true);
 
@@ -133,10 +133,13 @@ if ($method === 'POST') {
         $resolved[] = [$match_id, $player_id, $points, $ups, $partner_id];
     }
 
+    // Delete all existing results for this match, then insert fresh.
+    // This prevents stale rows accumulating when players change.
+    $pdo->prepare("DELETE FROM match_results WHERE match_id = ?")->execute([$match_id]);
+
     $stmt = $pdo->prepare("
         INSERT INTO match_results (match_id, player_id, points, ups, partner_id)
         VALUES (?, ?, ?, ?, ?)
-        ON DUPLICATE KEY UPDATE points=VALUES(points), ups=VALUES(ups), partner_id=VALUES(partner_id)
     ");
     foreach ($resolved as $r) {
         $stmt->execute($r);
