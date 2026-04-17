@@ -41,7 +41,7 @@ jobs:
               -o StrictHostKeyChecking=no \
               -o BatchMode=no \
               "${SFTP_USER}@${SFTP_HOST}" \
-              "mysql -h ${DB_HOST} -u ${DB_USER} -p${DB_PASS} ${DB_NAME}" \
+              "mysql --default-character-set=utf8mb4 -h ${DB_HOST} -u ${DB_USER} -p${DB_PASS} ${DB_NAME}" \
               < "${sql_file}"
             echo "Done: $sql_file"
           done
