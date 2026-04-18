@@ -1,5 +1,7 @@
 <?php
-// GET /php/player_stats.php?id=1 -> career totals + year-by-year + match details + format record + head-to-head
+// GET /php/player_stats.php?id=1
+//   -> career totals + year-by-year + match details
+//      + format record + head-to-head (opponents) + partners record
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
 
@@ -32,7 +34,7 @@ $stmt->execute([$id]);
 $player = $stmt->fetch();
 if (!$player) { http_response_code(404); echo json_encode(['error' => 'Player not found']); exit; }
 
-// ── Year-by-year summary (most recent first) ───────────────────────────────────
+// ── Year-by-year summary (most recent first) ────────────────────────────────
 $stmt2 = $pdo->prepare("
     SELECT
         t.year,
@@ -53,8 +55,7 @@ $stmt2 = $pdo->prepare("
 $stmt2->execute([$id]);
 $player['years'] = $stmt2->fetchAll();
 
-// ── Per-match details: partner + opponents per match ───────────────────────────
-// LEFT JOIN all other players in the same match, split by same/opposite team
+// ── Per-match details: partner + opponents per match ────────────────────────
 $stmt3 = $pdo->prepare("
     SELECT
         t.year,
@@ -97,7 +98,7 @@ foreach ($player['years'] as &$yr) {
 }
 unset($yr);
 
-// ── Record by match format ────────────────────────────────────────────────────
+// ── Record by match format ───────────────────────────────────────────────
 $stmt4 = $pdo->prepare("
     SELECT
         r.format,
@@ -130,13 +131,27 @@ $player['format_record'] = array_map(function($r) {
     ];
 }, $stmt4->fetchAll(PDO::FETCH_ASSOC));
 
-// ── Head-to-head record vs each opponent ─────────────────────────────────
-// Each opponent appearance in a match is counted separately (so a fourball
-// opponent pair each get credited with 1 head-to-head record per match).
+// Helper to normalise a people-list row to {id, name, played, wins, halves, losses}
+function normPeople($id_key, $name_key) {
+    return function($r) use ($id_key, $name_key) {
+        return [
+            'id'     => (int)$r[$id_key],
+            'name'   => $r[$name_key],
+            'played' => (int)$r['played'],
+            'wins'   => (int)$r['wins'],
+            'halves' => (int)$r['halves'],
+            'losses' => (int)$r['losses'],
+        ];
+    };
+}
+
+// ── Head-to-head vs each opponent ───────────────────────────────────────
+// Each opponent appearance is counted individually (fourball opponents each
+// get one record per match, same as singles).
 $stmt5 = $pdo->prepare("
     SELECT
-        opp.id   AS opponent_id,
-        opp.name AS opponent_name,
+        opp.id   AS opp_id,
+        opp.name AS opp_name,
         COUNT(*)                                                 AS played,
         COALESCE(SUM(CASE WHEN mr.points=2 THEN 1 END), 0)      AS wins,
         COALESCE(SUM(CASE WHEN mr.points=1 THEN 1 END), 0)      AS halves,
@@ -152,15 +167,29 @@ $stmt5 = $pdo->prepare("
     ORDER BY played DESC, wins DESC
 ");
 $stmt5->execute([$id]);
-$player['head_to_head'] = array_map(function($r) {
-    return [
-        'opponent_id'   => (int)$r['opponent_id'],
-        'opponent_name' => $r['opponent_name'],
-        'played'        => (int)$r['played'],
-        'wins'          => (int)$r['wins'],
-        'halves'        => (int)$r['halves'],
-        'losses'        => (int)$r['losses'],
-    ];
-}, $stmt5->fetchAll(PDO::FETCH_ASSOC));
+$player['head_to_head'] = array_map(normPeople('opp_id', 'opp_name'), $stmt5->fetchAll(PDO::FETCH_ASSOC));
+
+// ── Partnership record (same-team players in shared matches) ─────────────
+// Singles matches have no partner, so they won't appear here.
+$stmt6 = $pdo->prepare("
+    SELECT
+        partner.id   AS partner_id,
+        partner.name AS partner_name,
+        COUNT(*)                                                 AS played,
+        COALESCE(SUM(CASE WHEN mr.points=2 THEN 1 END), 0)      AS wins,
+        COALESCE(SUM(CASE WHEN mr.points=1 THEN 1 END), 0)      AS halves,
+        COALESCE(SUM(CASE WHEN mr.points=0 THEN 1 END), 0)      AS losses
+    FROM match_results mr
+    JOIN players me          ON me.id  = mr.player_id
+    JOIN match_results mr_p  ON mr_p.match_id  = mr.match_id
+                             AND mr_p.player_id != mr.player_id
+    JOIN players partner     ON partner.id = mr_p.player_id
+                             AND partner.team = me.team
+    WHERE mr.player_id = ? AND mr.points IS NOT NULL
+    GROUP BY partner.id, partner.name
+    ORDER BY played DESC, wins DESC
+");
+$stmt6->execute([$id]);
+$player['partners_record'] = array_map(normPeople('partner_id', 'partner_name'), $stmt6->fetchAll(PDO::FETCH_ASSOC));
 
 echo json_encode($player);

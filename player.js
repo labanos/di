@@ -90,80 +90,138 @@ function ShareButton({ playerId, playerName }) {
   );
 }
 
-// ─── Opponent spotlight row ─────────────────────────────────────────────
+// ─── Shared: one spotlight row (person name + W/H/L record) ─────────────────
+// `person` must have: name, played, wins, halves, losses
 
-function OpponentStat({ label, opp, highlight }) {
-  const color = highlight === 'wins' ? 'text-green-600' : highlight === 'losses' ? 'text-red-500' : 'text-slate-700';
+function PersonSpotlight({ label, person, highlight }) {
+  const color = highlight === 'wins'   ? 'text-green-600'
+              : highlight === 'losses' ? 'text-red-500'
+              : 'text-slate-700';
   return (
     <div className="flex items-center justify-between py-2">
       <div className="flex items-center gap-2 min-w-0">
-        <span className="text-xs text-slate-400 w-24 shrink-0">{label}</span>
-        <span className="font-medium text-slate-700 text-sm truncate">{opp.opponent_name}</span>
+        <span className="text-xs text-slate-400 w-28 shrink-0">{label}</span>
+        <span className="font-medium text-slate-700 text-sm truncate">{person.name}</span>
       </div>
       <div className="text-xs mono ml-2 whitespace-nowrap flex items-center gap-1">
-        <span className={`font-bold text-sm ${color}`}>{opp[highlight]}</span>
+        <span className={`font-bold text-sm ${color}`}>{person[highlight]}</span>
         <span className="text-slate-300">|</span>
-        <span className="text-green-600">{opp.wins}W</span>
-        <span className="text-amber-500">{opp.halves}H</span>
-        <span className="text-slate-400">{opp.losses}L</span>
+        <span className="text-green-600">{person.wins}W</span>
+        <span className="text-amber-500">{person.halves}H</span>
+        <span className="text-slate-400">{person.losses}L</span>
         <span className="text-slate-300">of</span>
-        <span className="text-slate-500">{opp.played}</span>
+        <span className="text-slate-500">{person.played}</span>
       </div>
     </div>
   );
 }
 
-// ─── Stats card (format record + opponent spotlights + full h2h table) ───
+// ─── Shared: expandable people section (opponents OR partners) ──────────────
+//
+// Props:
+//   title          – section heading, e.g. "Opponents"
+//   people         – array of { id, name, played, wins, halves, losses }
+//   spotlightLabels – { played, wins, losses }  label strings for the 3 top rows
+//   toggleLabel    – word used in "All N <word>" toggle, e.g. "opponents"
 
-function StatsCard({ data }) {
-  const fmt = data.format_record || [];
-  const h2h = data.head_to_head  || [];
-  const [showAllH2H, setShowAllH2H] = React.useState(false);
-  // col: 'opponent_name' | 'played' | 'wins' | 'halves' | 'losses'
-  // dir: 'asc' | 'desc'
-  const [h2hSort, setH2HSort] = React.useState({ col: 'played', dir: 'desc' });
+function PersonSection({ title, people, spotlightLabels, toggleLabel }) {
+  const [showAll, setShowAll] = React.useState(false);
+  const [sort, setSort]       = React.useState({ col: 'played', dir: 'desc' });
 
   function toggleSort(col) {
-    setH2HSort(s => ({
+    setSort(s => ({
       col,
-      // same col → flip; new col → desc for numbers, asc for name
       dir: s.col === col
         ? (s.dir === 'desc' ? 'asc' : 'desc')
-        : (col === 'opponent_name' ? 'asc' : 'desc'),
+        : (col === 'name' ? 'asc' : 'desc'),
     }));
   }
 
-  const sortedH2H = [...h2h].sort((a, b) => {
-    const va = a[h2hSort.col], vb = b[h2hSort.col];
+  const sorted = [...people].sort((a, b) => {
+    const va = a[sort.col], vb = b[sort.col];
     const cmp = typeof va === 'string' ? va.localeCompare(vb) : va - vb;
-    return h2hSort.dir === 'asc' ? cmp : -cmp;
+    return sort.dir === 'asc' ? cmp : -cmp;
   });
 
-  // Mini component for a sortable column header
+  const topPlayed = [...people].sort((a, b) => b.played - a.played)[0] || null;
+  const topWins   = people.filter(p => p.wins   > 0).sort((a, b) => b.wins   - a.wins)[0]   || null;
+  const topLosses = people.filter(p => p.losses > 0).sort((a, b) => b.losses - a.losses)[0] || null;
+
+  // Sortable column header — defined inside so it closes over sort / toggleSort
   function Th({ col, label, align = 'right', color = '' }) {
-    const active = h2hSort.col === col;
+    const active = sort.col === col;
     return (
       <th
+        onClick={() => toggleSort(col)}
         className={`py-1 font-medium cursor-pointer select-none hover:text-slate-600 transition-colors ${
           align === 'left' ? 'text-left' : 'text-right'
         } ${active ? 'text-slate-600' : color || 'text-slate-400'}`}
-        onClick={() => toggleSort(col)}
       >
         {label}
         <span className="ml-0.5 text-slate-300">
-          {active ? (h2hSort.dir === 'asc' ? '▲' : '▼') : '⇅'}
+          {active ? (sort.dir === 'asc' ? '▲' : '▼') : '⇅'}
         </span>
       </th>
     );
   }
 
-  const mostPlayed = h2h.length > 0
-    ? [...h2h].sort((a, b) => b.played - a.played)[0]
-    : null;
-  const mostBeaten = h2h.filter(o => o.wins > 0).sort((a, b) => b.wins - a.wins)[0]       || null;
-  const mostLostTo = h2h.filter(o => o.losses > 0).sort((a, b) => b.losses - a.losses)[0] || null;
+  return (
+    <div className="px-4 py-3">
+      <div className="text-xs font-bold uppercase tracking-wide text-slate-400 mb-1">{title}</div>
 
-  if (fmt.length === 0 && h2h.length === 0) return null;
+      {/* Three spotlight rows */}
+      <div className="divide-y divide-slate-50">
+        {topPlayed && <PersonSpotlight label={spotlightLabels.played} person={topPlayed} highlight="played" />}
+        {topWins   && <PersonSpotlight label={spotlightLabels.wins}   person={topWins}   highlight="wins" />}
+        {topLosses && <PersonSpotlight label={spotlightLabels.losses} person={topLosses} highlight="losses" />}
+      </div>
+
+      {/* Toggle */}
+      <button
+        onClick={() => setShowAll(v => !v)}
+        className="mt-3 flex items-center gap-1 text-xs text-slate-400 hover:text-slate-600 transition-colors select-none"
+      >
+        <span>{showAll ? '▾' : '▸'}</span>
+        <span>{showAll ? 'Hide full list' : `All ${people.length} ${toggleLabel}`}</span>
+      </button>
+
+      {/* Full sortable table */}
+      {showAll && (
+        <table className="w-full text-xs mt-2">
+          <thead>
+            <tr className="border-b border-slate-100">
+              <Th col="name"   label="Name"   align="left" />
+              <Th col="played" label="M" />
+              <Th col="wins"   label="W" color="text-green-600" />
+              <Th col="halves" label="H" color="text-amber-500" />
+              <Th col="losses" label="L" />
+            </tr>
+          </thead>
+          <tbody>
+            {sorted.map(p => (
+              <tr key={p.id} className="border-t border-slate-50">
+                <td className="py-1.5 text-slate-700 font-medium">{p.name}</td>
+                <td className="py-1.5 text-right mono text-slate-500">{p.played}</td>
+                <td className="py-1.5 text-right mono text-green-600">{p.wins}</td>
+                <td className="py-1.5 text-right mono text-amber-500">{p.halves}</td>
+                <td className="py-1.5 text-right mono text-slate-400">{p.losses}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </div>
+  );
+}
+
+// ─── Stats card ─────────────────────────────────────────────────────────────
+
+function StatsCard({ data }) {
+  const fmt      = data.format_record   || [];
+  const opponents = data.head_to_head   || [];
+  const partners  = data.partners_record || [];
+
+  if (fmt.length === 0 && opponents.length === 0 && partners.length === 0) return null;
 
   return (
     <div className="bg-white rounded-2xl shadow-sm overflow-hidden mt-4">
@@ -205,52 +263,35 @@ function StatsCard({ data }) {
         </div>
       )}
 
-      {/* Opponent spotlights + expandable full list */}
-      {h2h.length > 0 && (
-        <div className="px-4 py-3">
-          <div className="text-xs font-bold uppercase tracking-wide text-slate-400 mb-1">Opponents</div>
+      {/* Opponents */}
+      {opponents.length > 0 && (
+        <div className="border-t border-slate-100">
+          <PersonSection
+            title="Opponents"
+            people={opponents}
+            toggleLabel="opponents"
+            spotlightLabels={{
+              played: 'Most played',
+              wins:   'Most beaten',
+              losses: 'Most losses to',
+            }}
+          />
+        </div>
+      )}
 
-          {/* Three spotlight rows */}
-          <div className="divide-y divide-slate-50">
-            {mostPlayed && <OpponentStat label="Most played"    opp={mostPlayed} highlight="played" />}
-            {mostBeaten && <OpponentStat label="Most beaten"    opp={mostBeaten} highlight="wins" />}
-            {mostLostTo && <OpponentStat label="Most losses to" opp={mostLostTo} highlight="losses" />}
-          </div>
-
-          {/* Toggle */}
-          <button
-            onClick={() => setShowAllH2H(v => !v)}
-            className="mt-3 flex items-center gap-1 text-xs text-slate-400 hover:text-slate-600 transition-colors select-none"
-          >
-            <span>{showAllH2H ? '▾' : '▸'}</span>
-            <span>{showAllH2H ? 'Hide full list' : `All ${h2h.length} opponents`}</span>
-          </button>
-
-          {/* Full sortable h2h table */}
-          {showAllH2H && (
-            <table className="w-full text-xs mt-2">
-              <thead>
-                <tr className="border-b border-slate-100">
-                  <Th col="opponent_name" label="Opponent" align="left" />
-                  <Th col="played"        label="M" />
-                  <Th col="wins"          label="W" color="text-green-600" />
-                  <Th col="halves"        label="H" color="text-amber-500" />
-                  <Th col="losses"        label="L" />
-                </tr>
-              </thead>
-              <tbody>
-                {sortedH2H.map(opp => (
-                  <tr key={opp.opponent_id} className="border-t border-slate-50">
-                    <td className="py-1.5 text-slate-700 font-medium">{opp.opponent_name}</td>
-                    <td className="py-1.5 text-right mono text-slate-500">{opp.played}</td>
-                    <td className="py-1.5 text-right mono text-green-600">{opp.wins}</td>
-                    <td className="py-1.5 text-right mono text-amber-500">{opp.halves}</td>
-                    <td className="py-1.5 text-right mono text-slate-400">{opp.losses}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
+      {/* Partners */}
+      {partners.length > 0 && (
+        <div className="border-t border-slate-100">
+          <PersonSection
+            title="Partners"
+            people={partners}
+            toggleLabel="partners"
+            spotlightLabels={{
+              played: 'Most played with',
+              wins:   'Most wins with',
+              losses: 'Most losses with',
+            }}
+          />
         </div>
       )}
     </div>
