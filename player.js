@@ -54,6 +54,48 @@ function MatchDetailsTable({ details }) {
   );
 }
 
+// ─── Share button ──────────────────────────────────────────────────────
+
+function ShareButton({ playerId, playerName }) {
+  const [state, setState] = React.useState('idle'); // idle | copied | error
+
+  function share() {
+    const url = `${window.location.origin}${window.location.pathname}#player/${playerId}`;
+    if (navigator.share) {
+      // Native share sheet (mobile)
+      navigator.share({ title: `${playerName} — Damsgaard Invitational`, url })
+        .catch(() => {}); // user cancelled — ignore
+    } else if (navigator.clipboard) {
+      navigator.clipboard.writeText(url)
+        .then(() => { setState('copied'); setTimeout(() => setState('idle'), 2000); })
+        .catch(() => { setState('error'); setTimeout(() => setState('idle'), 2000); });
+    }
+  }
+
+  return (
+    <button
+      onClick={share}
+      title="Share player profile"
+      className="flex items-center gap-1.5 text-sm text-slate-400 hover:text-slate-700 transition-colors"
+    >
+      {state === 'copied' ? (
+        <span className="text-green-600 text-xs font-medium">✓ Link copied</span>
+      ) : state === 'error' ? (
+        <span className="text-red-400 text-xs">Could not copy</span>
+      ) : (
+        <>
+          {/* Share / chain-link icon */}
+          <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round"
+              d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+          </svg>
+          <span className="text-xs">Share</span>
+        </>
+      )}
+    </button>
+  );
+}
+
 // ─── Opponent spotlight row ─────────────────────────────────────────────
 
 function OpponentStat({ label, opp, highlight }) {
@@ -86,7 +128,7 @@ function StatsCard({ data }) {
   const mostPlayed = h2h.length > 0
     ? [...h2h].sort((a, b) => b.played - a.played)[0]
     : null;
-  const mostBeaten = h2h.filter(o => o.wins > 0).sort((a, b) => b.wins - a.wins)[0]   || null;
+  const mostBeaten = h2h.filter(o => o.wins > 0).sort((a, b) => b.wins - a.wins)[0]       || null;
   const mostLostTo = h2h.filter(o => o.losses > 0).sort((a, b) => b.losses - a.losses)[0] || null;
 
   if (fmt.length === 0 && h2h.length === 0) return null;
@@ -170,7 +212,12 @@ function PlayerView({ playerId, onBack }) {
 
   return (
     <div className="max-w-xl mx-auto p-4">
-      <button onClick={onBack} className="mb-4 text-sm text-slate-500 hover:text-slate-800">← Back</button>
+
+      {/* Top bar: back + share */}
+      <div className="mb-4 flex items-center justify-between">
+        <button onClick={onBack} className="text-sm text-slate-500 hover:text-slate-800">← Back</button>
+        <ShareButton playerId={playerId} playerName={data.name} />
+      </div>
 
       {/* Team header card */}
       <div className={`rounded-2xl p-6 mb-4 text-white ${t.bg}`}>
