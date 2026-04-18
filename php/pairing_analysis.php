@@ -1,5 +1,6 @@
 <?php
 // Captain's pairing assistant — evaluates a proposed matchup using historical data.
+// v1.0.1 — deploy bump
 //
 // GET  /php/pairing_analysis.php?format=fourball&blue_ids=1,2&red_ids=7,9
 // POST /php/pairing_analysis.php with JSON { format, blue_ids:[], red_ids:[] }
