@@ -57,13 +57,12 @@ function MatchDetailsTable({ details }) {
 // ─── Share button ──────────────────────────────────────────────────────
 
 function ShareButton({ playerId, playerName }) {
-  const [state, setState] = React.useState('idle'); // idle | copied | error
+  const [state, setState] = React.useState('idle');
 
   function share() {
     const url = `${window.location.origin}${window.location.pathname}#player/${playerId}`;
     if (navigator.share) {
-      navigator.share({ title: `${playerName} — Damsgaard Invitational`, url })
-        .catch(() => {});
+      navigator.share({ title: `${playerName} — Damsgaard Invitational`, url }).catch(() => {});
     } else if (navigator.clipboard) {
       navigator.clipboard.writeText(url)
         .then(() => { setState('copied'); setTimeout(() => setState('idle'), 2000); })
@@ -72,11 +71,8 @@ function ShareButton({ playerId, playerName }) {
   }
 
   return (
-    <button
-      onClick={share}
-      title="Share player profile"
-      className="flex items-center gap-1.5 text-sm text-slate-400 hover:text-slate-700 transition-colors"
-    >
+    <button onClick={share} title="Share player profile"
+      className="flex items-center gap-1.5 text-sm text-slate-400 hover:text-slate-700 transition-colors">
       {state === 'copied' ? (
         <span className="text-green-600 text-xs font-medium">✓ Link copied</span>
       ) : state === 'error' ? (
@@ -123,6 +119,43 @@ function StatsCard({ data }) {
   const fmt = data.format_record || [];
   const h2h = data.head_to_head  || [];
   const [showAllH2H, setShowAllH2H] = React.useState(false);
+  // col: 'opponent_name' | 'played' | 'wins' | 'halves' | 'losses'
+  // dir: 'asc' | 'desc'
+  const [h2hSort, setH2HSort] = React.useState({ col: 'played', dir: 'desc' });
+
+  function toggleSort(col) {
+    setH2HSort(s => ({
+      col,
+      // same col → flip; new col → desc for numbers, asc for name
+      dir: s.col === col
+        ? (s.dir === 'desc' ? 'asc' : 'desc')
+        : (col === 'opponent_name' ? 'asc' : 'desc'),
+    }));
+  }
+
+  const sortedH2H = [...h2h].sort((a, b) => {
+    const va = a[h2hSort.col], vb = b[h2hSort.col];
+    const cmp = typeof va === 'string' ? va.localeCompare(vb) : va - vb;
+    return h2hSort.dir === 'asc' ? cmp : -cmp;
+  });
+
+  // Mini component for a sortable column header
+  function Th({ col, label, align = 'right', color = '' }) {
+    const active = h2hSort.col === col;
+    return (
+      <th
+        className={`py-1 font-medium cursor-pointer select-none hover:text-slate-600 transition-colors ${
+          align === 'left' ? 'text-left' : 'text-right'
+        } ${active ? 'text-slate-600' : color || 'text-slate-400'}`}
+        onClick={() => toggleSort(col)}
+      >
+        {label}
+        <span className="ml-0.5 text-slate-300">
+          {active ? (h2hSort.dir === 'asc' ? '▲' : '▼') : '⇅'}
+        </span>
+      </th>
+    );
+  }
 
   const mostPlayed = h2h.length > 0
     ? [...h2h].sort((a, b) => b.played - a.played)[0]
@@ -179,12 +212,12 @@ function StatsCard({ data }) {
 
           {/* Three spotlight rows */}
           <div className="divide-y divide-slate-50">
-            {mostPlayed && <OpponentStat label="Most played"   opp={mostPlayed} highlight="played" />}
-            {mostBeaten && <OpponentStat label="Most beaten"   opp={mostBeaten} highlight="wins" />}
+            {mostPlayed && <OpponentStat label="Most played"    opp={mostPlayed} highlight="played" />}
+            {mostBeaten && <OpponentStat label="Most beaten"    opp={mostBeaten} highlight="wins" />}
             {mostLostTo && <OpponentStat label="Most losses to" opp={mostLostTo} highlight="losses" />}
           </div>
 
-          {/* Toggle: show all opponents */}
+          {/* Toggle */}
           <button
             onClick={() => setShowAllH2H(v => !v)}
             className="mt-3 flex items-center gap-1 text-xs text-slate-400 hover:text-slate-600 transition-colors select-none"
@@ -193,30 +226,28 @@ function StatsCard({ data }) {
             <span>{showAllH2H ? 'Hide full list' : `All ${h2h.length} opponents`}</span>
           </button>
 
-          {/* Full h2h table — sorted by most played */}
+          {/* Full sortable h2h table */}
           {showAllH2H && (
             <table className="w-full text-xs mt-2">
               <thead>
-                <tr className="text-slate-400 border-b border-slate-100">
-                  <th className="py-1 text-left font-medium">Opponent</th>
-                  <th className="py-1 text-right font-medium">M</th>
-                  <th className="py-1 text-right font-medium text-green-600">W</th>
-                  <th className="py-1 text-right font-medium text-amber-500">H</th>
-                  <th className="py-1 text-right font-medium text-slate-400">L</th>
+                <tr className="border-b border-slate-100">
+                  <Th col="opponent_name" label="Opponent" align="left" />
+                  <Th col="played"        label="M" />
+                  <Th col="wins"          label="W" color="text-green-600" />
+                  <Th col="halves"        label="H" color="text-amber-500" />
+                  <Th col="losses"        label="L" />
                 </tr>
               </thead>
               <tbody>
-                {[...h2h]
-                  .sort((a, b) => b.played - a.played || b.wins - a.wins)
-                  .map(opp => (
-                    <tr key={opp.opponent_id} className="border-t border-slate-50">
-                      <td className="py-1.5 text-slate-700 font-medium">{opp.opponent_name}</td>
-                      <td className="py-1.5 text-right mono text-slate-500">{opp.played}</td>
-                      <td className="py-1.5 text-right mono text-green-600">{opp.wins}</td>
-                      <td className="py-1.5 text-right mono text-amber-500">{opp.halves}</td>
-                      <td className="py-1.5 text-right mono text-slate-400">{opp.losses}</td>
-                    </tr>
-                  ))}
+                {sortedH2H.map(opp => (
+                  <tr key={opp.opponent_id} className="border-t border-slate-50">
+                    <td className="py-1.5 text-slate-700 font-medium">{opp.opponent_name}</td>
+                    <td className="py-1.5 text-right mono text-slate-500">{opp.played}</td>
+                    <td className="py-1.5 text-right mono text-green-600">{opp.wins}</td>
+                    <td className="py-1.5 text-right mono text-amber-500">{opp.halves}</td>
+                    <td className="py-1.5 text-right mono text-slate-400">{opp.losses}</td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           )}
