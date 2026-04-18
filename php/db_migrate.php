@@ -38,12 +38,17 @@ function run_migrations($pdo) {
         id         INT AUTO_INCREMENT PRIMARY KEY,
         match_id   INT NOT NULL,
         player_id  INT NOT NULL,
-        points     TINYINT NOT NULL COMMENT '0=loss 1=halved 2=win',
-        ups        INT NOT NULL DEFAULT 0 COMMENT 'positive=win margin negative=loss margin 0=halved',
+        points     TINYINT NULL     COMMENT '0=loss 1=halved 2=win NULL=upcoming/not played yet',
+        ups        INT NULL DEFAULT NULL COMMENT 'positive=win margin negative=loss margin 0=halved NULL=not played yet',
         partner_id INT DEFAULT NULL,
         UNIQUE KEY uniq_result (match_id, player_id),
         CONSTRAINT fk_mr_match   FOREIGN KEY (match_id)   REFERENCES matches(id),
         CONSTRAINT fk_mr_player  FOREIGN KEY (player_id)  REFERENCES players(id),
         CONSTRAINT fk_mr_partner FOREIGN KEY (partner_id) REFERENCES players(id)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+    // Allow NULL for upcoming matches (players scheduled, not yet played)
+    // Safe to re-run — MySQL silently succeeds if column is already nullable
+    try { $pdo->exec("ALTER TABLE match_results MODIFY COLUMN points TINYINT NULL COMMENT '0=loss 1=halved 2=win NULL=not played yet'"); } catch (Exception $e) {}
+    try { $pdo->exec("ALTER TABLE match_results MODIFY COLUMN ups INT NULL DEFAULT NULL COMMENT 'hole margin NULL=not played'"); } catch (Exception $e) {}
 }
