@@ -62,13 +62,12 @@ function ShareButton({ playerId, playerName }) {
   function share() {
     const url = `${window.location.origin}${window.location.pathname}#player/${playerId}`;
     if (navigator.share) {
-      // Native share sheet (mobile)
       navigator.share({ title: `${playerName} — Damsgaard Invitational`, url })
-        .catch(() => {}); // user cancelled — ignore
+        .catch(() => {});
     } else if (navigator.clipboard) {
       navigator.clipboard.writeText(url)
         .then(() => { setState('copied'); setTimeout(() => setState('idle'), 2000); })
-        .catch(() => { setState('error'); setTimeout(() => setState('idle'), 2000); });
+        .catch(() => { setState('error');  setTimeout(() => setState('idle'), 2000); });
     }
   }
 
@@ -84,7 +83,6 @@ function ShareButton({ playerId, playerName }) {
         <span className="text-red-400 text-xs">Could not copy</span>
       ) : (
         <>
-          {/* Share / chain-link icon */}
           <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round"
               d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
@@ -119,11 +117,12 @@ function OpponentStat({ label, opp, highlight }) {
   );
 }
 
-// ─── Stats card (format record + opponent spotlights) ──────────────────────
+// ─── Stats card (format record + opponent spotlights + full h2h table) ───
 
 function StatsCard({ data }) {
   const fmt = data.format_record || [];
   const h2h = data.head_to_head  || [];
+  const [showAllH2H, setShowAllH2H] = React.useState(false);
 
   const mostPlayed = h2h.length > 0
     ? [...h2h].sort((a, b) => b.played - a.played)[0]
@@ -173,15 +172,54 @@ function StatsCard({ data }) {
         </div>
       )}
 
-      {/* Opponent spotlights */}
-      {(mostPlayed || mostBeaten || mostLostTo) && (
+      {/* Opponent spotlights + expandable full list */}
+      {h2h.length > 0 && (
         <div className="px-4 py-3">
           <div className="text-xs font-bold uppercase tracking-wide text-slate-400 mb-1">Opponents</div>
+
+          {/* Three spotlight rows */}
           <div className="divide-y divide-slate-50">
-            {mostPlayed && <OpponentStat label="Most played" opp={mostPlayed} highlight="played" />}
-            {mostBeaten && <OpponentStat label="Most beaten" opp={mostBeaten} highlight="wins" />}
+            {mostPlayed && <OpponentStat label="Most played"   opp={mostPlayed} highlight="played" />}
+            {mostBeaten && <OpponentStat label="Most beaten"   opp={mostBeaten} highlight="wins" />}
             {mostLostTo && <OpponentStat label="Most losses to" opp={mostLostTo} highlight="losses" />}
           </div>
+
+          {/* Toggle: show all opponents */}
+          <button
+            onClick={() => setShowAllH2H(v => !v)}
+            className="mt-3 flex items-center gap-1 text-xs text-slate-400 hover:text-slate-600 transition-colors select-none"
+          >
+            <span>{showAllH2H ? '▾' : '▸'}</span>
+            <span>{showAllH2H ? 'Hide full list' : `All ${h2h.length} opponents`}</span>
+          </button>
+
+          {/* Full h2h table — sorted by most played */}
+          {showAllH2H && (
+            <table className="w-full text-xs mt-2">
+              <thead>
+                <tr className="text-slate-400 border-b border-slate-100">
+                  <th className="py-1 text-left font-medium">Opponent</th>
+                  <th className="py-1 text-right font-medium">M</th>
+                  <th className="py-1 text-right font-medium text-green-600">W</th>
+                  <th className="py-1 text-right font-medium text-amber-500">H</th>
+                  <th className="py-1 text-right font-medium text-slate-400">L</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[...h2h]
+                  .sort((a, b) => b.played - a.played || b.wins - a.wins)
+                  .map(opp => (
+                    <tr key={opp.opponent_id} className="border-t border-slate-50">
+                      <td className="py-1.5 text-slate-700 font-medium">{opp.opponent_name}</td>
+                      <td className="py-1.5 text-right mono text-slate-500">{opp.played}</td>
+                      <td className="py-1.5 text-right mono text-green-600">{opp.wins}</td>
+                      <td className="py-1.5 text-right mono text-amber-500">{opp.halves}</td>
+                      <td className="py-1.5 text-right mono text-slate-400">{opp.losses}</td>
+                    </tr>
+                  ))}
+              </tbody>
+            </table>
+          )}
         </div>
       )}
     </div>
@@ -258,7 +296,6 @@ function PlayerView({ playerId, onBack }) {
               const isOpen = expandedYear === y.year;
               return (
                 <React.Fragment key={y.year}>
-                  {/* Summary row — click to expand */}
                   <tr
                     className={`border-b border-slate-50 text-right cursor-pointer select-none transition-colors ${isOpen ? 'bg-blue-50' : 'hover:bg-slate-50'}`}
                     onClick={() => setExpY(isOpen ? null : y.year)}
@@ -276,7 +313,6 @@ function PlayerView({ playerId, onBack }) {
                     <td className="px-4 py-2 mono text-slate-400">{y.losses}</td>
                     <td className="px-4 py-2 mono text-slate-500">{y.ups}</td>
                   </tr>
-                  {/* Expanded match details */}
                   {isOpen && (
                     <tr>
                       <td colSpan="7" className="p-0 bg-slate-50 border-b border-slate-100">
