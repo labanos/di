@@ -1,29 +1,34 @@
 // ─── This Year View ───────────────────────────────────────────────────────────
 
 // MatchRow: single match inside a round card
+// points===null  → upcoming (players set, not played)
+// blue.length===0 → no players assigned yet
 function MatchRow({ match }) {
   const blue = match.blue || [];
   const red  = match.red  || [];
-  // Points stored doubled in DB (2=win,1=half,0=loss); raw value returned by year_schedule.php
-  const bp   = blue.length > 0 ? blue[0].points : null;
+  const bp   = blue.length > 0 ? blue[0].points : undefined;
   const ups  = blue.length > 0 ? Math.abs(blue[0].ups || 0) : 0;
 
   let badge = null;
-  if (bp === 2)
+  if (bp === null) {
+    // Players assigned, not played yet
+    badge = <span className="shrink-0 text-xs text-slate-400 italic whitespace-nowrap">Upcoming</span>;
+  } else if (bp === 2) {
     badge = <span className="shrink-0 text-xs font-bold text-blue-600 whitespace-nowrap">{ups ? `Blue ${ups}UP` : 'Blue W'}</span>;
-  else if (bp === 1)
+  } else if (bp === 1) {
     badge = <span className="shrink-0 text-xs font-bold text-amber-500 whitespace-nowrap">Halved</span>;
-  else if (bp === 0)
+  } else if (bp === 0) {
     badge = <span className="shrink-0 text-xs font-bold text-red-600 whitespace-nowrap">{ups ? `Red ${ups}UP` : 'Red W'}</span>;
+  }
 
   return (
     <div className="flex items-center gap-2 py-1.5 text-xs border-t border-slate-50">
       <span className="text-slate-300 mono w-4 shrink-0 text-right">{match.match_number}</span>
-      <span className="text-blue-700 font-medium flex-1 min-w-0 truncate">
+      <span className={`flex-1 min-w-0 truncate font-medium ${bp === null ? 'text-slate-500' : 'text-blue-700'}`}>
         {blue.length > 0 ? blue.map(p => p.name).join(' & ') : '—'}
       </span>
       <span className="text-slate-300 shrink-0">vs</span>
-      <span className="text-red-700 font-medium flex-1 min-w-0 truncate text-right">
+      <span className={`flex-1 min-w-0 truncate text-right font-medium ${bp === null ? 'text-slate-500' : 'text-red-700'}`}>
         {red.length > 0 ? red.map(p => p.name).join(' & ') : '—'}
       </span>
       {badge}
@@ -34,6 +39,8 @@ function MatchRow({ match }) {
 // RoundCard: one round with its matches (or empty state)
 function RoundCard({ round }) {
   const matches = round.matches || [];
+  const played  = matches.filter(m => m.blue.length > 0 && m.blue[0].points !== null).length;
+  const total   = matches.length;
   return (
     <div className="px-4 py-3">
       <div className="flex items-center gap-2 mb-1">
@@ -41,14 +48,14 @@ function RoundCard({ round }) {
         <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 font-medium">
           {round.format}
         </span>
-        {matches.length > 0 &&
+        {total > 0 && (
           <span className="ml-auto text-xs text-slate-400">
-            {matches.length} match{matches.length !== 1 ? 'es' : ''}
+            {played}/{total} played
           </span>
-        }
+        )}
       </div>
       {matches.length === 0
-        ? <p className="text-xs text-slate-400 italic mt-1">No matches played yet</p>
+        ? <p className="text-xs text-slate-400 italic mt-1">No matches set up yet</p>
         : <div className="mt-1">{matches.map(m => <MatchRow key={m.match_id} match={m} />)}</div>
       }
     </div>
@@ -75,12 +82,11 @@ function ThisYearView() {
 
   const rounds = schedule.rounds || [];
 
-  // Ryder Cup score: 1pt per match win, 0.5pt per halved — taken from schedule so we
-  // count matches (not individual player rows), giving the correct team scoreline.
+  // Ryder Cup score — only count played matches (points !== null)
   let blueScore = 0, redScore = 0;
   for (const round of rounds) {
     for (const match of round.matches) {
-      const bp = match.blue[0]?.points ?? null;
+      const bp = match.blue[0]?.points ?? undefined;
       if      (bp === 2) { blueScore += 1; }
       else if (bp === 1) { blueScore += 0.5; redScore += 0.5; }
       else if (bp === 0) { redScore  += 1; }
