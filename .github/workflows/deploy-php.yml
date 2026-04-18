@@ -15,7 +15,7 @@ jobs:
 
       - name: Inject DB credentials
         run: |
-          FILES="php/db_connect.php php/db_migrate.php php/players.php php/leaderboard.php php/results.php php/player_stats.php php/matches.php php/admin.php php/year_schedule.php php/pairing_analysis.php"
+          FILES="php/db_connect.php php/db_migrate.php php/players.php php/leaderboard.php php/results.php php/player_stats.php php/matches.php php/admin.php php/year_schedule.php php/pairing_analysis.php php/pair_suggest.php"
           sed -i "s|%%DB_HOST%%|${{ secrets.DB_HOST }}|g" $FILES
           sed -i "s|%%DB_NAME%%|${{ secrets.DB_NAME }}|g" $FILES
           sed -i "s|%%DB_USER%%|${{ secrets.DB_USER }}|g" $FILES
@@ -43,6 +43,7 @@ jobs:
           put php/admin.php admin.php
           put php/year_schedule.php year_schedule.php
           put php/pairing_analysis.php pairing_analysis.php
+          put php/pair_suggest.php pair_suggest.php
           put php/.htaccess .htaccess
           SFTP
 
