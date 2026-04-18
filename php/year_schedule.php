@@ -1,7 +1,8 @@
 <?php
-// GET /php/year_schedule.php?year=YYYY — v2
+// GET /php/year_schedule.php?year=YYYY — v3
 // Returns rounds with match results (players, points, ups) for a given year.
-// If a round has no matches yet, its matches array is empty.
+// points=NULL means the match is upcoming (players assigned, not yet played).
+// If a round has no matches at all, its matches array is empty.
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
 
@@ -66,8 +67,9 @@ foreach ($rows as $row) {
     if ($row['name']) {
         $matchData[$rid][$mid][$row['team']][] = [
             'name'   => $row['name'],
-            'points' => (int)$row['points'],
-            'ups'    => (int)$row['ups'],
+            // Preserve NULL so frontend can distinguish upcoming vs played
+            'points' => $row['points'] !== null ? (int)$row['points'] : null,
+            'ups'    => $row['ups']    !== null ? (int)$row['ups']    : null,
         ];
     }
 }
