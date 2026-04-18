@@ -1,8 +1,7 @@
 // ─── Leaderboard View ────────────────────────────────────────────────────────
 
-const LEADERBOARD_YEARS = [2025,2024,2023,2022,2021,2020,2019,2018,2017,2016];
-
 function LeaderboardView() {
+  const [years, setYears]         = React.useState([]);
   const [data, setData]           = React.useState(null);
   const [error, setError]         = React.useState(null);
   const [teamFilter, setTeamFilter] = React.useState('all');
@@ -10,6 +9,15 @@ function LeaderboardView() {
   const [sortCol, setSortCol]     = React.useState('total_points');
   const [sortDir, setSortDir]     = React.useState('desc');
 
+  // Fetch available years from the DB on mount
+  React.useEffect(() => {
+    fetch(`${API}/admin.php?action=years`)
+      .then(r => r.json())
+      .then(setYears)
+      .catch(() => {}); // silently ignore; dropdown just shows "All time"
+  }, []);
+
+  // Fetch leaderboard whenever year changes
   React.useEffect(() => {
     setData(null);
     const url = year === 'all'
@@ -74,7 +82,7 @@ function LeaderboardView() {
           <select value={year} onChange={e => setYear(e.target.value)}
             className="border border-slate-200 rounded-lg px-3 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-400">
             <option value="all">All time</option>
-            {LEADERBOARD_YEARS.map(y => <option key={y} value={y}>{y}</option>)}
+            {years.map(y => <option key={y} value={y}>{y}</option>)}
           </select>
         </div>
 
@@ -96,9 +104,14 @@ function LeaderboardView() {
       </div>
 
       <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
-        {!data
-          ? <div className="py-12 flex justify-center"><Spinner /></div>
-          : (
+        {!data ? (
+          <div className="py-12 flex justify-center"><Spinner /></div>
+        ) : data.length === 0 ? (
+          <div className="py-12 text-center text-slate-400">
+            <div className="text-3xl mb-2">🏌️</div>
+            <p className="text-sm">No matches played{year !== 'all' ? ` in ${year}` : ''} yet.</p>
+          </div>
+        ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
