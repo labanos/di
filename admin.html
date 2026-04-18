@@ -43,6 +43,10 @@
             class="tab-btn px-4 py-1.5 rounded-lg text-sm font-semibold text-gray-500 hover:bg-gray-100 transition">
             Players
           </button>
+          <button onclick="showTab('pairings')" id="tab-pairings"
+            class="tab-btn px-4 py-1.5 rounded-lg text-sm font-semibold text-gray-500 hover:bg-gray-100 transition">
+            Pairings
+          </button>
         </div>
       </div>
     </header>
@@ -197,6 +201,52 @@
         </div>
       </div>
     </div>
+
+    <!-- ── PAIRINGS TAB ────────────────────────────────────────────────── -->
+    <div id="tab-pairings-content" class="hidden max-w-5xl mx-auto px-4 py-6 space-y-4">
+
+      <div class="bg-white rounded-2xl shadow p-5">
+        <h2 class="font-bold text-lg mb-1">🎯 Captain's Pairing Assistant</h2>
+        <p class="text-sm text-gray-500 mb-4">
+          Explore any proposed matchup. The model combines career format strength, partner chemistry,
+          and direct head-to-head history into a single predicted win probability.
+        </p>
+
+        <!-- Step 1: Format -->
+        <div class="mb-5">
+          <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Format</label>
+          <div id="pa-format-buttons" class="flex flex-wrap gap-2"></div>
+        </div>
+
+        <!-- Step 2: Players -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-5 mb-4">
+          <div>
+            <label class="block text-xs font-bold text-blue-700 uppercase tracking-wide mb-2">🔵 Blue Team</label>
+            <div id="pa-blue-pickers" class="space-y-2"></div>
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-red-700 uppercase tracking-wide mb-2">🔴 Red Team</label>
+            <div id="pa-red-pickers" class="space-y-2"></div>
+          </div>
+        </div>
+
+        <!-- Step 3: Analyze -->
+        <div class="flex items-center gap-3">
+          <button onclick="analyzePairing()"
+            class="bg-blue-600 hover:bg-blue-700 text-white rounded-lg px-5 py-2 text-sm font-semibold transition">
+            Analyze Matchup
+          </button>
+          <button onclick="clearPairing()"
+            class="text-gray-500 hover:text-gray-700 text-sm px-3 py-2">
+            Clear
+          </button>
+          <span id="pa-status" class="text-sm"></span>
+        </div>
+      </div>
+
+      <!-- Results -->
+      <div id="pa-results" class="hidden space-y-4"></div>
+    </div>
   </div>
 
   <script>
@@ -227,14 +277,15 @@
 
     // ── Tabs ──────────────────────────────────────────────────────────────────
     function showTab(name) {
-      ['matches','players'].forEach(t => {
+      ['matches','players','pairings'].forEach(t => {
         document.getElementById(`tab-${t}-content`).classList.toggle('hidden', t !== name);
         const btn = document.getElementById(`tab-${t}`);
         btn.className = t === name
           ? 'tab-btn px-4 py-1.5 rounded-lg text-sm font-semibold bg-blue-600 text-white transition'
           : 'tab-btn px-4 py-1.5 rounded-lg text-sm font-semibold text-gray-500 hover:bg-gray-100 transition';
       });
-      if (name === 'players') loadPlayers();
+      if (name === 'players')  loadPlayers();
+      if (name === 'pairings') initPairings();
     }
 
     // ── Init ──────────────────────────────────────────────────────────────────
@@ -671,6 +722,293 @@
           await refreshPlayerLists(); renderPlayerLists();
         } else { status.textContent = '✗ ' + (data.error||'Error'); status.className = 'text-sm text-red-600'; }
       } catch(e) { status.textContent = '✗ Network error'; status.className = 'text-sm text-red-600'; }
+    }
+
+    // ── Pairings tab ──────────────────────────────────────────────────────────
+    const PA_FORMATS = [
+      { value: 'fourball',  label: 'Fourball'  },
+      { value: 'greensome', label: 'Greensome' },
+      { value: 'foursome',  label: 'Foursome'  },
+      { value: 'singles',   label: 'Singles'   },
+    ];
+    let paFormat = 'fourball';
+    let paInited = false;
+
+    async function initPairings() {
+      if (paInited) return;
+      if (!allPlayers.length) await refreshPlayerLists();
+      renderPaFormatButtons();
+      renderPaPickers();
+      paInited = true;
+    }
+
+    function renderPaFormatButtons() {
+      const host = document.getElementById('pa-format-buttons');
+      host.innerHTML = PA_FORMATS.map(f => `
+        <button onclick="setPaFormat('${f.value}')"
+          class="pa-fmt-btn px-4 py-1.5 rounded-lg text-sm font-semibold transition ${
+            paFormat === f.value
+              ? 'bg-blue-600 text-white'
+              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+          }"
+          data-fmt="${f.value}">${f.label}</button>`).join('');
+    }
+
+    function setPaFormat(f) {
+      paFormat = f;
+      renderPaFormatButtons();
+      renderPaPickers();
+      // Clear stale results when format changes
+      const r = document.getElementById('pa-results');
+      r.classList.add('hidden');
+      r.innerHTML = '';
+    }
+
+    function renderPaPickers() {
+      const count = paFormat === 'singles' ? 1 : 2;
+      const buildPickers = (pool, teamClass) =>
+        Array.from({length: count}, (_, i) => `
+          <select class="w-full border rounded-lg px-3 py-2 text-sm pa-${teamClass}-pick">
+            <option value="">— select ${teamClass} ${count > 1 ? 'player ' + (i+1) : 'player'} —</option>
+            ${pool.map(p => `<option value="${p.id}">${esc(p.name)}</option>`).join('')}
+          </select>`).join('');
+      document.getElementById('pa-blue-pickers').innerHTML = buildPickers(bluePlayers, 'blue');
+      document.getElementById('pa-red-pickers').innerHTML  = buildPickers(redPlayers,  'red');
+    }
+
+    function clearPairing() {
+      document.querySelectorAll('.pa-blue-pick, .pa-red-pick').forEach(s => s.value = '');
+      const r = document.getElementById('pa-results');
+      r.classList.add('hidden');
+      r.innerHTML = '';
+      const status = document.getElementById('pa-status');
+      status.textContent = '';
+    }
+
+    function getPaIds(teamClass) {
+      return Array.from(document.querySelectorAll(`.pa-${teamClass}-pick`))
+        .map(s => parseInt(s.value))
+        .filter(Boolean);
+    }
+
+    async function analyzePairing() {
+      const status = document.getElementById('pa-status');
+      const results = document.getElementById('pa-results');
+      const blueIds = getPaIds('blue');
+      const redIds  = getPaIds('red');
+      const need = paFormat === 'singles' ? 1 : 2;
+
+      if (blueIds.length !== need || redIds.length !== need) {
+        status.textContent = `⚠ Select ${need} player${need>1?'s':''} per team`;
+        status.className = 'text-sm text-yellow-600';
+        return;
+      }
+      if (need === 2 && (blueIds[0] === blueIds[1] || redIds[0] === redIds[1])) {
+        status.textContent = '⚠ Same player selected twice';
+        status.className = 'text-sm text-yellow-600';
+        return;
+      }
+
+      status.textContent = 'Analyzing…';
+      status.className = 'text-sm text-gray-400';
+      results.classList.add('hidden');
+
+      try {
+        const qs = `format=${paFormat}&blue_ids=${blueIds.join(',')}&red_ids=${redIds.join(',')}`;
+        const res = await fetch(`${API}/pairing_analysis.php?${qs}`);
+        const data = await res.json();
+        if (data.error) {
+          status.textContent = '✗ ' + data.error;
+          status.className = 'text-sm text-red-600';
+          return;
+        }
+        status.textContent = '';
+        renderPairingResults(data);
+      } catch(e) {
+        status.textContent = '✗ Network error';
+        status.className = 'text-sm text-red-600';
+      }
+    }
+
+    function pctBar(bluePct) {
+      const redPct = 100 - bluePct;
+      return `
+        <div class="w-full h-4 flex rounded-full overflow-hidden border">
+          <div class="bg-blue-600" style="width:${bluePct}%"></div>
+          <div class="bg-red-600"  style="width:${redPct}%"></div>
+        </div>`;
+    }
+
+    function recordCell(rec) {
+      if (!rec || !rec.matches) return '<span class="text-gray-400">—</span>';
+      return `<span class="font-mono">${rec.wins}-${rec.halves}-${rec.losses}</span>
+              <span class="text-gray-400 ml-1">(${rec.matches})</span>`;
+    }
+
+    function favoredChip(edge) {
+      if (edge > 0.005) return '<span class="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-medium">Blue edge</span>';
+      if (edge < -0.005) return '<span class="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full font-medium">Red edge</span>';
+      return '<span class="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full font-medium">Even</span>';
+    }
+
+    function renderPairingResults(data) {
+      const results = document.getElementById('pa-results');
+      const bluePct = Math.round(data.blue_win_probability * 100);
+      const redPct  = 100 - bluePct;
+      const fmtLabel = data.format.charAt(0).toUpperCase() + data.format.slice(1);
+      const favored = bluePct === redPct
+        ? 'Dead even'
+        : bluePct > redPct
+          ? `🔵 Blue favored ${bluePct}%`
+          : `🔴 Red favored ${redPct}%`;
+
+      // Verdict card
+      let html = `
+        <div class="bg-white rounded-2xl shadow p-5">
+          <div class="flex items-center justify-between mb-3">
+            <h3 class="font-bold text-lg">Matchup Verdict</h3>
+            <span class="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded-full font-medium">${esc(fmtLabel)}</span>
+          </div>
+          <div class="text-2xl font-bold mb-2 ${bluePct > redPct ? 'text-blue-600' : (redPct > bluePct ? 'text-red-600' : 'text-gray-600')}">
+            ${favored}
+          </div>
+          <div class="text-sm text-gray-500 mb-3">
+            <span class="font-semibold text-blue-600">${bluePct}%</span> ·
+            <span class="font-semibold text-red-600">${redPct}%</span>
+          </div>
+          ${pctBar(bluePct)}
+        </div>`;
+
+      // Factor breakdown
+      html += `
+        <div class="bg-white rounded-2xl shadow p-5">
+          <h3 class="font-bold text-lg mb-3">Why?</h3>
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="text-xs uppercase tracking-wide text-gray-500 border-b">
+                <th class="text-left py-2 font-semibold">Factor</th>
+                <th class="text-right py-2 font-semibold">Weight</th>
+                <th class="text-right py-2 font-semibold text-blue-600">Blue</th>
+                <th class="text-right py-2 font-semibold text-red-600">Red</th>
+                <th class="text-right py-2 font-semibold">Edge</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${data.factors.map(f => `
+                <tr class="border-b last:border-0">
+                  <td class="py-2">${esc(f.label)}${
+                    f.sample !== undefined
+                      ? `<span class="text-xs text-gray-400 ml-1">(${f.sample} prior match${f.sample===1?'':'es'})</span>`
+                      : (f.blue_sample !== undefined
+                          ? `<span class="text-xs text-gray-400 ml-1">(B:${f.blue_sample} / R:${f.red_sample})</span>`
+                          : '')
+                  }</td>
+                  <td class="py-2 text-right text-gray-500">${Math.round(f.weight*100)}%</td>
+                  <td class="py-2 text-right font-mono">${f.blue.toFixed(3)}</td>
+                  <td class="py-2 text-right font-mono">${f.red.toFixed(3)}</td>
+                  <td class="py-2 text-right">${favoredChip(f.delta)}</td>
+                </tr>`).join('')}
+            </tbody>
+          </table>
+          <p class="text-xs text-gray-400 mt-3 leading-relaxed">
+            Values are smoothed win-rates (halves = 0.5). With no history, rates stay near 0.5 so the model doesn't over-react.
+          </p>
+        </div>`;
+
+      // Player format records side-by-side
+      html += `
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          ${teamRecordCard('🔵 Blue', 'blue', data.blue, data.format)}
+          ${teamRecordCard('🔴 Red',  'red',  data.red,  data.format)}
+        </div>`;
+
+      // H2H matrix
+      const blueIds = data.blue.players.map(p => p.id);
+      const redIds  = data.red.players.map(p => p.id);
+      const cellByKey = {};
+      data.h2h_matrix.forEach(c => { cellByKey[c.blue_id + '_' + c.red_id] = c; });
+
+      html += `
+        <div class="bg-white rounded-2xl shadow p-5 overflow-x-auto">
+          <h3 class="font-bold text-lg mb-1">Head-to-head history</h3>
+          <p class="text-xs text-gray-500 mb-3">
+            Blue's record versus each red player. Format "${esc(fmtLabel)}" shown first; overall (all formats) in parentheses.
+            Sample sizes can be small — treat these as context, not gospel.
+          </p>
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="text-xs uppercase tracking-wide text-gray-500 border-b">
+                <th class="text-left py-2 font-semibold">🔵 Blue</th>
+                ${data.red.players.map(p => `<th class="text-center py-2 font-semibold">vs ${esc(p.name)}</th>`).join('')}
+              </tr>
+            </thead>
+            <tbody>
+              ${data.blue.players.map(bp => `
+                <tr class="border-b last:border-0">
+                  <td class="py-2 font-medium">${esc(bp.name)}</td>
+                  ${data.red.players.map(rp => {
+                    const c = cellByKey[bp.id + '_' + rp.id];
+                    const f = c?.in_format   || {played:0,wins:0,halves:0,losses:0};
+                    const a = c?.all_formats || {played:0,wins:0,halves:0,losses:0};
+                    const fCell = f.played
+                      ? `<span class="font-mono">${f.wins}-${f.halves}-${f.losses}</span>`
+                      : `<span class="text-gray-300">—</span>`;
+                    const aCell = a.played
+                      ? `<span class="text-xs text-gray-500">(${a.wins}-${a.halves}-${a.losses})</span>`
+                      : `<span class="text-xs text-gray-300">(none)</span>`;
+                    return `<td class="py-2 text-center">${fCell}<br>${aCell}</td>`;
+                  }).join('')}
+                </tr>`).join('')}
+            </tbody>
+          </table>
+          <p class="text-xs text-gray-400 mt-3">Legend: W–H–L in this format, with overall (all formats) in grey parentheses.</p>
+        </div>`;
+
+      results.innerHTML = html;
+      results.classList.remove('hidden');
+      results.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    function teamRecordCard(title, colorKey, team, format) {
+      const colorClass = colorKey === 'blue' ? 'text-blue-700' : 'text-red-700';
+      const fmtLabel = format.charAt(0).toUpperCase() + format.slice(1);
+      let body = `
+        <div class="bg-white rounded-2xl shadow p-5">
+          <h3 class="font-bold ${colorClass} mb-3">${title}</h3>
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="text-xs uppercase tracking-wide text-gray-500 border-b">
+                <th class="text-left py-1 font-semibold">Player</th>
+                <th class="text-right py-1 font-semibold">${esc(fmtLabel)} record</th>
+                <th class="text-right py-1 font-semibold">Rate</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${team.players.map(p => `
+                <tr class="border-b last:border-0">
+                  <td class="py-2">${esc(p.name)}</td>
+                  <td class="py-2 text-right">${recordCell(p.format_record)}</td>
+                  <td class="py-2 text-right font-mono text-xs ${p.format_record.matches ? '' : 'text-gray-400'}">
+                    ${p.format_record.matches ? p.format_record.rate.toFixed(3) : '—'}
+                  </td>
+                </tr>`).join('')}
+              ${team.partner_record ? `
+                <tr class="bg-gray-50">
+                  <td class="py-2 text-xs uppercase tracking-wide text-gray-500 font-semibold">As partners</td>
+                  <td class="py-2 text-right">${recordCell(team.partner_record)}</td>
+                  <td class="py-2 text-right font-mono text-xs ${team.partner_record.matches ? '' : 'text-gray-400'}">
+                    ${team.partner_record.matches ? team.partner_record.rate.toFixed(3) : '—'}
+                  </td>
+                </tr>` : ''}
+              <tr class="font-semibold">
+                <td class="pt-3">Pair strength</td>
+                <td></td>
+                <td class="pt-3 text-right font-mono">${team.pair_strength.toFixed(3)}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>`;
+      return body;
     }
   </script>
 </body>
