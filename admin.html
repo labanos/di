@@ -51,7 +51,7 @@
       </div>
     </header>
 
-    <!-- ── MATCHES TAB ─────────────────────────────────────── -->
+    <!-- ── MATCHES TAB ───────────────────────────────────────────────────────── -->
     <div id="tab-matches-content" class="max-w-4xl mx-auto px-4 py-6 space-y-4">
 
       <!-- Setup New Year (collapsible) -->
@@ -157,7 +157,7 @@
       </button>
     </div>
 
-    <!-- ── PLAYERS TAB ─────────────────────────────────────── -->
+    <!-- ── PLAYERS TAB ───────────────────────────────────────────────────────── -->
     <div id="tab-players-content" class="hidden max-w-4xl mx-auto px-4 py-6">
 
       <div class="bg-white rounded-2xl shadow p-4 mb-6">
@@ -202,7 +202,7 @@
       </div>
     </div>
 
-    <!-- ── PAIRINGS TAB ────────────────────────────────────── -->
+    <!-- ── PAIRINGS TAB ────────────────────────────────────────────────────── -->
     <div id="tab-pairings-content" class="hidden max-w-5xl mx-auto px-4 py-6 space-y-4">
 
       <div class="bg-white rounded-2xl shadow p-5">
@@ -253,16 +253,21 @@
         <!-- SUGGEST MODE -->
         <div id="pa-suggest-section" class="hidden">
           <div class="mb-4">
+            <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Find</label>
+            <div id="pa-rank-buttons" class="flex gap-2"></div>
+            <p class="text-xs text-gray-400 mt-1">"Best" = opponent most likely to <em>beat</em> the locked pair (hardest matchup). "Worst" = opponent least likely to beat them (easiest matchup).</p>
+          </div>
+          <div class="mb-4">
             <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Lock team</label>
             <div id="pa-locked-team-buttons" class="flex gap-2"></div>
-            <p class="text-xs text-gray-400 mt-1">Pick the team whose lineup is already decided — the other team's best response will be suggested.</p>
+            <p class="text-xs text-gray-400 mt-1">Pick the team whose lineup is already decided — candidates from the other team will be ranked.</p>
           </div>
           <div class="mb-4">
             <label id="pa-locked-label" class="block text-xs font-bold uppercase tracking-wide mb-2"></label>
             <div id="pa-locked-pickers" class="space-y-2"></div>
           </div>
           <div class="flex items-center gap-3">
-            <button onclick="suggestPairings()"
+            <button id="pa-find-btn" onclick="suggestPairings()"
               class="bg-blue-600 hover:bg-blue-700 text-white rounded-lg px-5 py-2 text-sm font-semibold transition">
               Find Best Opponent
             </button>
@@ -291,7 +296,7 @@
     let currentYear    = null;
     let currentRound   = 1;
 
-    // ── Auth ───────────────────────────────────────────────────────────────────────
+    // ── Auth ──────────────────────────────────────────────────────────────────────────────────────
     function checkPassword() {
       if (document.getElementById('pw-input').value === ADMIN_PASSWORD) {
         document.getElementById('auth-gate').classList.add('hidden');
@@ -305,7 +310,7 @@
       if (e.key === 'Enter') checkPassword();
     });
 
-    // ── Tabs ───────────────────────────────────────────────────────────────────────
+    // ── Tabs ──────────────────────────────────────────────────────────────────────────────────────
     function showTab(name) {
       ['matches','players','pairings'].forEach(t => {
         document.getElementById(`tab-${t}-content`).classList.toggle('hidden', t !== name);
@@ -318,12 +323,12 @@
       if (name === 'pairings') initPairings();
     }
 
-    // ── Init ───────────────────────────────────────────────────────────────────────
+    // ── Init ──────────────────────────────────────────────────────────────────────────────────────
     async function init() {
       await Promise.all([refreshYears(), refreshPlayerLists()]);
     }
 
-    // ── Year dropdown (dynamic) ───────────────────────────────────────────────────
+    // ── Year dropdown (dynamic) ────────────────────────────────────────────────────────────────
     async function refreshYears() {
       const res   = await fetch(`${API}/admin.php?action=years`);
       const years = await res.json();
@@ -334,7 +339,7 @@
       if (years.length) currentYear = years[0];
     }
 
-    // ── New Year panel ─────────────────────────────────────────────────────────────
+    // ── New Year panel ───────────────────────────────────────────────────────────────────────
     function toggleNewYear() {
       const panel = document.getElementById('new-year-panel');
       const arrow = document.getElementById('new-year-arrow');
@@ -386,7 +391,7 @@
       redPlayers  = allPlayers.filter(p => p.team === 'red').sort((a,b) => a.name.localeCompare(b.name));
     }
 
-    // ── Matches tab ─────────────────────────────────────────────────────────────────
+    // ── Matches tab ───────────────────────────────────────────────────────────────────────────────
     async function loadMatches() {
       currentYear  = parseInt(document.getElementById('year-select').value);
       currentRound = parseInt(document.getElementById('round-select').value);
@@ -609,7 +614,7 @@
       btn.disabled = false;
     }
 
-    // ── Players tab ─────────────────────────────────────────────────────────────────
+    // ── Players tab ───────────────────────────────────────────────────────────────────────────────
     async function loadPlayers() {
       document.getElementById('players-loading').classList.remove('hidden');
       await refreshPlayerLists();
@@ -754,7 +759,7 @@
       } catch(e) { status.textContent = '✗ Network error'; status.className = 'text-sm text-red-600'; }
     }
 
-    // ── Pairings tab ───────────────────────────────────────────────────────────────
+    // ── Pairings tab ────────────────────────────────────────────────────────────────────────────
     const PA_FORMATS = [
       { value: 'fourball',  label: 'Fourball'  },
       { value: 'greensome', label: 'Greensome' },
@@ -764,6 +769,7 @@
     let paFormat     = 'fourball';
     let paMode       = 'analyze';   // 'analyze' | 'suggest'
     let paLockedTeam = 'red';       // team whose lineup is fixed in suggest mode
+    let paRank       = 'best';      // 'best' | 'worst' opposing candidates
     let paInited     = false;
 
     async function initPairings() {
@@ -772,9 +778,36 @@
       renderPaModeButtons();
       renderPaFormatButtons();
       renderPaPickers();
+      renderPaRankButtons();
       renderPaLockedTeamButtons();
       renderPaLockedPickers();
       paInited = true;
+    }
+
+    function renderPaRankButtons() {
+      const host = document.getElementById('pa-rank-buttons');
+      const opts = [
+        { value: 'best',  emoji: '🏆', label: 'Best opponent'  },
+        { value: 'worst', emoji: '🪶', label: 'Worst opponent' },
+      ];
+      host.innerHTML = opts.map(o => {
+        const on = paRank === o.value;
+        const cls = on
+          ? (o.value === 'best' ? 'bg-emerald-600 text-white' : 'bg-amber-500 text-white')
+          : 'bg-gray-100 text-gray-600 hover:bg-gray-200';
+        return `<button onclick="setPaRank('${o.value}')"
+          class="px-4 py-1.5 rounded-lg text-sm font-semibold transition ${cls}">
+          ${o.emoji} ${o.label}</button>`;
+      }).join('');
+      const btn = document.getElementById('pa-find-btn');
+      if (btn) btn.textContent = paRank === 'worst' ? 'Find Worst Opponent' : 'Find Best Opponent';
+    }
+
+    function setPaRank(r) {
+      paRank = r;
+      renderPaRankButtons();
+      const res = document.getElementById('pa-results');
+      res.classList.add('hidden'); res.innerHTML = '';
     }
 
     function renderPaModeButtons() {
@@ -947,12 +980,12 @@
         return;
       }
 
-      status.textContent = 'Scouring opponents…';
+      status.textContent = paRank === 'worst' ? 'Hunting weakest opponents…' : 'Scouring opponents…';
       status.className = 'text-sm text-gray-400';
       results.classList.add('hidden');
 
       try {
-        const qs = `format=${paFormat}&locked_team=${paLockedTeam}&locked_ids=${lockedIds.join(',')}&limit=10`;
+        const qs = `format=${paFormat}&locked_team=${paLockedTeam}&locked_ids=${lockedIds.join(',')}&limit=10&rank=${paRank}`;
         const res = await fetch(`${API}/pair_suggest.php?${qs}`);
         const data = await res.json();
         if (data.error) {
@@ -977,6 +1010,8 @@
       const lockedEmoji = data.locked_team === 'blue' ? '🔵' : '🔴';
       const lockedNames = data.locked_players.map(p => p.name).join(' & ');
       const oppName = data.opposing_team.charAt(0).toUpperCase() + data.opposing_team.slice(1);
+      const rank = data.rank === 'worst' ? 'worst' : 'best';
+      const isWorst = rank === 'worst';
 
       if (!data.suggestions || !data.suggestions.length) {
         results.innerHTML = `<div class="bg-white rounded-2xl shadow p-5 text-sm text-gray-600">
@@ -992,19 +1027,29 @@
       const topNames = top.players.map(p => p.name).join(' & ');
       const isSingles = data.format === 'singles';
 
+      const heroEmoji = isWorst ? '🪶' : '🏆';
+      const heroLabel = isWorst ? `Weakest ${oppName}` : `Strongest ${oppName}`;
+      const heroSuffix = isSingles ? 'pick' : 'pair';
+      const heroBadge  = isWorst
+        ? '<span class="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium">Worst opponent</span>'
+        : '<span class="text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-medium">Best opponent</span>';
+
       // Top-pick hero card
       let html = `
         <div class="bg-white rounded-2xl shadow p-5">
           <div class="flex items-center justify-between mb-3">
-            <div>
-              <h3 class="font-bold text-lg">${oppEmoji} Best ${oppName} ${isSingles ? 'pick' : 'pair'} vs ${lockedEmoji} ${esc(lockedNames)}</h3>
-              <p class="text-xs text-gray-500 mt-1">Evaluated ${data.candidates_evaluated} candidate${data.candidates_evaluated===1?'':'s'}</p>
+            <div class="flex items-center gap-2 flex-wrap">
+              <h3 class="font-bold text-lg">${heroEmoji} ${heroLabel} ${heroSuffix} vs ${lockedEmoji} ${esc(lockedNames)}</h3>
+              ${heroBadge}
             </div>
             <span class="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded-full font-medium">${esc(fmtLabel)}</span>
           </div>
+          <p class="text-xs text-gray-500 mb-3">Evaluated ${data.candidates_evaluated} candidate${data.candidates_evaluated===1?'':'s'}</p>
           <div class="text-2xl font-bold mb-1 ${oppColor}">${esc(topNames)}</div>
           <div class="text-sm text-gray-600 mb-3">
             <span class="font-semibold ${oppColor}">${topPct}% win probability</span> vs locked pair
+            ${isWorst ? '<span class="text-xs text-gray-400 ml-1">(lowest of all candidates)</span>'
+                     : '<span class="text-xs text-gray-400 ml-1">(highest of all candidates)</span>'}
           </div>
           <div class="w-full h-4 flex rounded-full overflow-hidden border">
             <div class="${oppBg}" style="width:${topPct}%"></div>
@@ -1013,10 +1058,13 @@
         </div>`;
 
       // Ranked table of all candidates
+      const sortNote = isWorst
+        ? `Sorted by ${oppName}'s win probability against ${esc(lockedNames)} — <strong>lowest first</strong> (the easiest matchups for the locked pair).`
+        : `Sorted by ${oppName}'s win probability against ${esc(lockedNames)} — <strong>highest first</strong> (the hardest matchups for the locked pair).`;
       html += `
         <div class="bg-white rounded-2xl shadow p-5 overflow-x-auto">
-          <h3 class="font-bold text-lg mb-1">All candidates, ranked</h3>
-          <p class="text-xs text-gray-500 mb-3">Sorted by ${oppName}'s win probability against ${esc(lockedNames)}. Small-sample matchups pull toward 50% (Laplace-smoothed, k=4).</p>
+          <h3 class="font-bold text-lg mb-1">${isWorst ? 'Weakest' : 'Top'} candidates, ranked</h3>
+          <p class="text-xs text-gray-500 mb-3">${sortNote} Small-sample matchups pull toward 50% (Laplace-smoothed, k=4).</p>
           <table class="w-full text-sm">
             <thead>
               <tr class="text-xs uppercase tracking-wide text-gray-500 border-b">

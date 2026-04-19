@@ -4,16 +4,21 @@
 // Given a locked team + 1-2 players + format, enumerate every valid opposing
 // lineup and rank by win probability against the locked pair.
 //
-// GET /php/pair_suggest.php?format=fourball&locked_team=red&locked_ids=3,7&limit=10
+// GET /php/pair_suggest.php?format=fourball&locked_team=red&locked_ids=3,7&limit=10&rank=best
+//
+// rank=best  (default): return the opposing lineups with the HIGHEST win
+//                       probability against the locked pair (hardest matchups).
+// rank=worst         : return the opposing lineups with the LOWEST win
+//                       probability against the locked pair (weakest opponents).
 //
 // Response shape:
 // {
-//   format, locked_team, opposing_team,
+//   format, locked_team, opposing_team, rank,
 //   locked_players: [{id,name}], locked_pair_strength, locked_partner_rate,
 //   candidates_evaluated: N,
 //   suggestions: [
 //     { player_ids, players, win_probability, pair_strength, partner_rate, partner_sample, h2h_rate, h2h_sample },
-//     ... top N, sorted desc by win_probability
+//     ... top N, sorted by win_probability (desc for best, asc for worst)
 //   ]
 // }
 header('Content-Type: application/json');
@@ -26,11 +31,13 @@ require_once __DIR__ . '/db_connect.php';
 require_once __DIR__ . '/db_migrate.php';
 run_migrations($pdo);
 
-// ── Parse input ──────────────────────────────────────────────────────────────
+// ── Parse input ───────────────────────────────────────────────────────────────────────
 $format      = $_GET['format']      ?? '';
 $locked_team = $_GET['locked_team'] ?? '';
 $locked_ids  = array_filter(array_map('intval', explode(',', $_GET['locked_ids'] ?? '')));
 $limit       = max(1, min(50, intval($_GET['limit'] ?? 10)));
+$rank        = strtolower($_GET['rank'] ?? 'best');
+if (!in_array($rank, ['best','worst'], true)) $rank = 'best';
 
 $valid_formats = ['fourball','greensome','foursome','singles'];
 if (!in_array($format, $valid_formats, true)) {
@@ -52,7 +59,7 @@ if (count($locked_ids) !== $expected) {
 }
 $opposing_team = ($locked_team === 'blue') ? 'red' : 'blue';
 
-// ── Validate locked players (must be on locked team) ─────────────────────────
+// ── Validate locked players (must be on locked team) ──────────────────────────────────────────────────
 $place_locked = implode(',', array_fill(0, count($locked_ids), '?'));
 $stmt = $pdo->prepare("SELECT id, name, team FROM players WHERE id IN ($place_locked)");
 $stmt->execute($locked_ids);
@@ -71,7 +78,7 @@ if (count($locked_players) !== count($locked_ids)) {
     exit;
 }
 
-// ── Opposing roster ──────────────────────────────────────────────────────────
+// ── Opposing roster ──────────────────────────────────────────────────────────────────────
 $stmt = $pdo->prepare("SELECT id, name FROM players WHERE team = ? ORDER BY name");
 $stmt->execute([$opposing_team]);
 $opposing_players = [];
@@ -85,7 +92,7 @@ if (count($opposing_ids) < $expected) {
     exit;
 }
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
+// ── Helpers ──────────────────────────────────────────────────────────────────────────────────────
 function smooth_rate($w, $h, $l, $k = 4) {
     $n = $w + $h + $l;
     return ($w + 0.5 * $h + $k * 0.5) / ($n + $k);
@@ -96,7 +103,7 @@ function enrich_record($rec) {
     return $rec;
 }
 
-// ── Per-player format record (locked + opposing) ─────────────────────────────
+// ── Per-player format record (locked + opposing) ────────────────────────────────────────────────────────
 $all_ids = array_merge($locked_ids, $opposing_ids);
 $place_all = implode(',', array_fill(0, count($all_ids), '?'));
 $stmt = $pdo->prepare("
@@ -191,7 +198,7 @@ if ($format !== 'singles') {
     }
 }
 
-// ── H2H: opposing player vs locked player, this format ───────────────────────
+// ── H2H: opposing player vs locked player, this format ───────────────────────────
 $place_opp = implode(',', array_fill(0, count($opposing_ids), '?'));
 $stmt = $pdo->prepare("
     SELECT mr.player_id  AS opp_id,
@@ -222,7 +229,7 @@ foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
     ];
 }
 
-// ── Enumerate candidate lineups ──────────────────────────────────────────────
+// ── Enumerate candidate lineups ──────────────────────────────────────────────────────────
 $candidates = [];
 if ($format === 'singles') {
     foreach ($opposing_ids as $id) { $candidates[] = [$id]; }
@@ -235,7 +242,7 @@ if ($format === 'singles') {
     }
 }
 
-// ── Score each candidate ─────────────────────────────────────────────────────
+// ── Score each candidate ────────────────────────────────────────────────────────────────────
 $suggestions = [];
 foreach ($candidates as $cand_ids) {
     // Pair strength
@@ -294,12 +301,22 @@ foreach ($candidates as $cand_ids) {
     $suggestions[] = $entry;
 }
 
-// Sort descending by win probability; break ties by pair_strength then h2h_sample
-usort($suggestions, function($a, $b) {
-    if ($b['win_probability'] !== $a['win_probability']) return $b['win_probability'] <=> $a['win_probability'];
-    if ($b['pair_strength']   !== $a['pair_strength'])   return $b['pair_strength']   <=> $a['pair_strength'];
-    return $b['h2h_sample'] <=> $a['h2h_sample'];
-});
+// Sort by win probability (desc for best, asc for worst); break ties by
+// pair_strength (same direction as win_prob), then by h2h_sample (always desc
+// — more evidence ranks higher either way).
+if ($rank === 'worst') {
+    usort($suggestions, function($a, $b) {
+        if ($a['win_probability'] !== $b['win_probability']) return $a['win_probability'] <=> $b['win_probability'];
+        if ($a['pair_strength']   !== $b['pair_strength'])   return $a['pair_strength']   <=> $b['pair_strength'];
+        return $b['h2h_sample'] <=> $a['h2h_sample'];
+    });
+} else {
+    usort($suggestions, function($a, $b) {
+        if ($b['win_probability'] !== $a['win_probability']) return $b['win_probability'] <=> $a['win_probability'];
+        if ($b['pair_strength']   !== $a['pair_strength'])   return $b['pair_strength']   <=> $a['pair_strength'];
+        return $b['h2h_sample'] <=> $a['h2h_sample'];
+    });
+}
 $total_candidates = count($suggestions);
 $suggestions = array_slice($suggestions, 0, $limit);
 
@@ -307,6 +324,7 @@ echo json_encode([
     'format'                => $format,
     'locked_team'           => $locked_team,
     'opposing_team'         => $opposing_team,
+    'rank'                  => $rank,
     'locked_players'        => array_map(function($id) use ($locked_players) { return $locked_players[$id]; }, $locked_ids),
     'locked_pair_strength'  => round($locked_pair_strength, 3),
     'locked_partner_rate'   => $format !== 'singles' ? round($locked_partner_rate, 3) : null,
