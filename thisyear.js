@@ -149,6 +149,7 @@ function ThisYearView() {
                   <th className="px-4 py-2 text-left">Player</th>
                   <th className="px-4 py-2">M</th>
                   <th className="px-4 py-2">Pts</th>
+                  <th className="px-4 py-2">UPs</th>
                   <th className="px-4 py-2">W</th>
                   <th className="px-4 py-2">H</th>
                   <th className="px-4 py-2">L</th>
@@ -156,7 +157,15 @@ function ThisYearView() {
               </thead>
               <tbody>
                 {[...standings]
-                  .sort((a, b) => parseFloat(b.total_points) - parseFloat(a.total_points))
+                  .sort((a, b) => {
+                    // Primary: total points (desc). Tiebreaker: total ups (desc).
+                    const pa = parseFloat(a.total_points) || 0;
+                    const pb = parseFloat(b.total_points) || 0;
+                    if (pb !== pa) return pb - pa;
+                    const ua = parseFloat(a.total_ups) || 0;
+                    const ub = parseFloat(b.total_ups) || 0;
+                    return ub - ua;
+                  })
                   .map((p, i) => (
                   <tr key={p.id}
                     className="border-b border-slate-50 hover:bg-slate-50 cursor-pointer"
@@ -170,6 +179,7 @@ function ThisYearView() {
                     </td>
                     <td className="px-4 py-2 text-right mono text-slate-500">{p.matches_played}</td>
                     <td className="px-4 py-2 text-right mono font-bold">{fmtPts(p.total_points)}</td>
+                    <td className="px-4 py-2 text-right mono text-slate-500">{p.total_ups}</td>
                     <td className="px-4 py-2 text-right mono text-green-600">{p.wins}</td>
                     <td className="px-4 py-2 text-right mono text-amber-500">{p.halves}</td>
                     <td className="px-4 py-2 text-right mono text-slate-400">{p.losses}</td>
